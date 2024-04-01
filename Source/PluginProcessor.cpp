@@ -25,6 +25,7 @@ TutorialADCAudioProcessor::TutorialADCAudioProcessor()
     std::make_unique<juce::AudioParameterFloat> ( "gain", "Gain", 0.0f, 1.0f, 1.0f),
     std::make_unique<juce::AudioParameterFloat> ( "feedback", "Feedback", 0.0f, 1.0f, 0.35f),
     std::make_unique<juce::AudioParameterFloat> ( "mix", "Dry / Mix", 0.0f, 1.0f, 0.5f),
+    std::make_unique<juce::AudioParameterBool> ( "toggle", "On / Off", true),
 })
 {
 }
@@ -165,33 +166,37 @@ void TutorialADCAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, 
     float gain = state.getParameter ("gain")->getValue();
     float feedback = state.getParameter ("feedback")->getValue();
     float mix = state.getParameter("mix")->getValue();
+    bool toggle = state.getParameter("toggle")->getValue();
     
-    int delayBufferSize = delayBuffer.getNumSamples();
-    
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
-    {
-        auto* channelData = buffer.getWritePointer (channel);
-        int delayPos = delayBufferPosition;
+    if (toggle) {
         
+        int delayBufferSize = delayBuffer.getNumSamples();
         
-        for (int i=0; i< buffer.getNumSamples(); ++i) {
-            float drySample = channelData[i];
-            float delaySample = delayBuffer.getSample(channel, delayPos) * feedback;
-            delayBuffer.setSample(channel, delayPos, drySample + delaySample);
-            
-            delayPos++;
-            if(delayPos == delayBufferSize)
-                delayPos = 0;
+        for (int channel = 0; channel < totalNumInputChannels; ++channel)
+        {
+            auto* channelData = buffer.getWritePointer (channel);
+            int delayPos = delayBufferPosition;
             
             
-            channelData[i] = (drySample * (1.0f - mix) + (delaySample * mix));
-            channelData[i] *= gain;
+            for (int i=0; i< buffer.getNumSamples(); ++i) {
+                float drySample = channelData[i];
+                float delaySample = delayBuffer.getSample(channel, delayPos) * feedback;
+                delayBuffer.setSample(channel, delayPos, drySample + delaySample);
+                
+                delayPos++;
+                if(delayPos == delayBufferSize)
+                    delayPos = 0;
+                
+                
+                channelData[i] = (drySample * (1.0f - mix) + (delaySample * mix));
+                channelData[i] *= gain;
+            }
         }
+        
+        delayBufferPosition += buffer.getNumSamples();
+        if (delayBufferPosition >= delayBufferSize)
+            delayBufferPosition -= delayBufferSize;
     }
-    
-    delayBufferPosition += buffer.getNumSamples();
-    if (delayBufferPosition >= delayBufferSize)
-        delayBufferPosition -= delayBufferSize;
 
 }
 
@@ -213,12 +218,18 @@ void TutorialADCAudioProcessor::getStateInformation (juce::MemoryBlock& destData
     // You should use this method to store your parameters in the memory block.
     // You could do that either as raw data, or use the XML or ValueTree classes
     // as intermediaries to make it easy to save and load complex data.
+    
+    if (auto xmlState = state.copyState().createXml())
+        copyXmlToBinary(*xmlState, destData);
 }
+
 
 void TutorialADCAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     // You should use this method to restore your parameters from this memory block,
     // whose contents will have been created by the getStateInformation() call.
+    if (auto xmlState = getXmlFromBinary(data, sizeInBytes))
+        state.replaceState (juce::ValueTree::fromXml (*xmlState));
 }
 
 //==============================================================================
