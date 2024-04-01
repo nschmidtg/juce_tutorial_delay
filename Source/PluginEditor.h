@@ -29,6 +29,10 @@ private:
     // access the processor object that created it.
     TutorialADCAudioProcessor& audioProcessor;
     
+    juce::Image background;
+    juce::Slider gainSlider, feedbackSlider, mixSlider;
+    juce::AudioProcessorValueTreeState::SliderAttachment gainAttachment, feedbackAttachment, mixAttachment;
+    
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TutorialADCAudioProcessorEditor)
 };

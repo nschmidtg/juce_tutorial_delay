@@ -208,8 +208,8 @@ bool TutorialADCAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* TutorialADCAudioProcessor::createEditor()
 {
-    //return new TutorialADCAudioProcessorEditor (*this);
-    return new juce::GenericAudioProcessorEditor (*this);
+    return new TutorialADCAudioProcessorEditor (*this);
+    //return new juce::GenericAudioProcessorEditor (*this);
 }
 
 //==============================================================================
