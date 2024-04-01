@@ -14,7 +14,8 @@ TutorialADCAudioProcessorEditor::TutorialADCAudioProcessorEditor (TutorialADCAud
     : AudioProcessorEditor (&p), audioProcessor (p),
 gainAttachment(p.state, "gain", gainSlider),
 feedbackAttachment(p.state, "feedback", feedbackSlider),
-mixAttachment(p.state, "mix", mixSlider)
+mixAttachment(p.state, "mix", mixSlider),
+timeAttachment(p.state, "time", timeSlider)
 {
     // Make sure that before the constructor has finished, you've set the
     // editor's size to whatever you need it to be.
@@ -32,7 +33,11 @@ mixAttachment(p.state, "mix", mixSlider)
     mixLabel.setText("Mix", juce::dontSendNotification);
     addAndMakeVisible(mixLabel);
     
-    for (auto* slider : { &gainSlider, &feedbackSlider, &mixSlider }){
+    timeSlider.setSliderStyle(juce::Slider::SliderStyle::Rotary);
+    timeLabel.setText("Time", juce::dontSendNotification);
+    addAndMakeVisible(timeLabel);
+    
+    for (auto* slider : { &gainSlider, &feedbackSlider, &mixSlider, &timeSlider }){
         slider->setTextBoxStyle (juce::Slider::TextBoxBelow, true, 50, 30);
         addAndMakeVisible(slider);
     }
@@ -81,6 +86,9 @@ void TutorialADCAudioProcessorEditor::resized()
     
     feedbackSlider.setBounds(66, getHeight() - 91 - knobSize, knobSize, knobSize);
     feedbackLabel.setBounds(feedbackSlider.getBounds().removeFromBottom(30));
+    
+    timeSlider.setBounds(getWidth()-61-knobSize, getHeight() - 91 - knobSize, knobSize, knobSize);
+    timeLabel.setBounds(timeSlider.getBounds().removeFromBottom(30));
     
     //juce::Rectangle<int> knobsBounds = bounds.removeFromTop (getHeight() / 2);
     //juce::Rectangle<int> feedbackBounds = knobsBounds.removeFromLeft (knobsBounds.getWidth() / 2);

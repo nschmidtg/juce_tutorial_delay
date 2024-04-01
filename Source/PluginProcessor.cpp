@@ -25,6 +25,7 @@ TutorialADCAudioProcessor::TutorialADCAudioProcessor()
     std::make_unique<juce::AudioParameterFloat> ( "gain", "Gain", 0.0f, 1.0f, 1.0f),
     std::make_unique<juce::AudioParameterFloat> ( "feedback", "Feedback", 0.0f, 1.0f, 0.35f),
     std::make_unique<juce::AudioParameterFloat> ( "mix", "Dry / Mix", 0.0f, 1.0f, 0.5f),
+    std::make_unique<juce::AudioParameterInt>   ( "time", "Time", 0, 2000, 300),
     std::make_unique<juce::AudioParameterBool> ( "toggle", "On / Off", true),
 })
 {
@@ -101,9 +102,9 @@ void TutorialADCAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
-    int delayMiliseconds = 200;
-    auto delaySamples = (int) std::round (sampleRate * delayMiliseconds / 1000.0);
-    delayBuffer.setSize(2, delaySamples);
+    int maxDelay = 2000;
+    auto delayMaxSamples = (int) std::round (sampleRate * maxDelay / 1000.0);
+    delayBuffer.setSize(2, delayMaxSamples);
     delayBuffer.clear();
     delayBufferPosition = 0;
     
@@ -166,6 +167,7 @@ void TutorialADCAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, 
     float gain = state.getParameter ("gain")->getValue();
     float feedback = state.getParameter ("feedback")->getValue();
     float mix = state.getParameter("mix")->getValue();
+    int time = state.getParameter("time")->getValue();
     bool toggle = state.getParameter("toggle")->getValue();
     
     if (toggle) {
