@@ -32,6 +32,7 @@ private:
     juce::Image background;
     juce::Slider gainSlider, feedbackSlider, mixSlider;
     juce::AudioProcessorValueTreeState::SliderAttachment gainAttachment, feedbackAttachment, mixAttachment;
+    juce::Label gainLabel, mixLabel, feedbackLabel;
     
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TutorialADCAudioProcessorEditor)
