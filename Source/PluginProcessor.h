@@ -58,6 +58,7 @@ private:
     //==============================================================================
     int delayBufferPosition = 0;
     juce::AudioBuffer<float> delayBuffer;
+    double globalSampleRate;
     
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TutorialADCAudioProcessor)
