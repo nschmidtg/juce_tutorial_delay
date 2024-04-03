@@ -103,7 +103,7 @@ void TutorialADCAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
     int maxDelay = 2000;
-    auto delayMaxSamples = (int) std::round (sampleRate * maxDelay / 1000.0);
+    delayMaxSamples = (int) std::round (sampleRate * maxDelay / 1000.0);
     delayBuffer.setSize(2, delayMaxSamples);
     delayBuffer.clear();
     delayBufferPosition = 0;
@@ -182,33 +182,23 @@ void TutorialADCAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, 
     if (toggle) {
         
         
-        if (currentTimeInSamples != oldTimeInSamples) {
-            float ratio = (float)(oldTimeInSamples) / (currentTimeInSamples);
-            for (int channel = 0; channel < 2; ++channel) {
-                for (int i = 0; i < currentTimeInSamples - 1 ; ++i) {
-                    float index = i * ratio;
-                    float lower = index; // Lower index
-                    float upper = lower + 1; // Upper index, ensuring it's within bounds
-                    float t = index - lower; // Fractional part
-                    // Linear interpolation
-                    float firstValue = delayBuffer.getSample(channel, (int) std::round (lower));
-                    float secondValue = delayBuffer.getSample(channel, (int) std::round (upper));
-                    float interpolatedValue = firstValue + (t) * (secondValue - firstValue);
-                    delayBuffer.setSample(channel, i, interpolatedValue);
-                }
-            }
-        }
-        
+        float ratio = (float)(oldTimeInSamples) / (currentTimeInSamples);
                 
         for (int channel = 0; channel < totalNumInputChannels; ++channel)
         {
             auto* channelData = buffer.getWritePointer (channel);
             int delayPos = delayBufferPosition;
             
-            
+            //leer primero y ultimo
             for (int i=0; i< buffer.getNumSamples(); ++i) {
                 float drySample = channelData[i];
-                float delaySample = delayBuffer.getSample(channel, delayPos) * feedback;
+                int lowIndex = (int) std::round (delayPos * ratio);
+                int highIndex =  (int) std::round ((delayPos + 1) * ratio);
+                if(highIndex >= delayMaxSamples - 1 )
+                    highIndex = delayMaxSamples - 1;
+                float delaySampleLow = delayBuffer.getSample(channel, lowIndex);
+                float delaySampleHigh = delayBuffer.getSample(channel, highIndex);
+                float delaySample = ((delaySampleLow + delaySampleHigh) / 2) * feedback;
                 delayBuffer.setSample(channel, delayPos, drySample + delaySample);
                 
                 delayPos++;
