@@ -25,7 +25,7 @@ TutorialADCAudioProcessor::TutorialADCAudioProcessor()
     std::make_unique<juce::AudioParameterFloat> ( "gain", "Gain", 0.0f, 1.0f, 1.0f),
     std::make_unique<juce::AudioParameterFloat> ( "feedback", "Feedback", 0.0f, 1.0f, 0.35f),
     std::make_unique<juce::AudioParameterFloat> ( "mix", "Dry / Mix", 0.0f, 1.0f, 0.5f),
-    std::make_unique<juce::AudioParameterFloat>   ( "time", "Time", 0.020f, 2.0f, 0.300f),
+    std::make_unique<juce::AudioParameterFloat>   ( "time", "Time", 0.040f, 1.0f, 0.300f),
     std::make_unique<juce::AudioParameterBool> ( "toggle", "On / Off", true),
 })
 {
@@ -103,11 +103,13 @@ void TutorialADCAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
     int maxDelay = 2000;
-    globalSampleRate = sampleRate;
     auto delayMaxSamples = (int) std::round (sampleRate * maxDelay / 1000.0);
     delayBuffer.setSize(2, delayMaxSamples);
     delayBuffer.clear();
     delayBufferPosition = 0;
+    globalSampleRate = (float) sampleRate;
+    
+    timeSmoothed.reset(sampleRate, 0.0001);
     
 }
 
@@ -169,10 +171,34 @@ void TutorialADCAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, 
     float feedback = state.getParameter ("feedback")->getValue();
     float mix = state.getParameter("mix")->getValue();
     float time = state.getParameter("time")->getValue();
-    int currentTimeInSamples = (int) std::round (time * globalSampleRate * 2);
+    timeSmoothed.setTargetValue(time);
+    float intermedio = timeSmoothed.getNextValue() * globalSampleRate * 2.0f;
+    int currentTimeInSamples = (int) std::round (intermedio);
+    if(currentTimeInSamples <= 1)
+        currentTimeInSamples = 1;
+    
     bool toggle = state.getParameter("toggle")->getValue();
     
     if (toggle) {
+        
+        
+        if (currentTimeInSamples != oldTimeInSamples) {
+            float ratio = (float)(oldTimeInSamples) / (currentTimeInSamples);
+            for (int channel = 0; channel < 2; ++channel) {
+                for (int i = 0; i < currentTimeInSamples - 1 ; ++i) {
+                    float index = i * ratio;
+                    float lower = index; // Lower index
+                    float upper = lower + 1; // Upper index, ensuring it's within bounds
+                    float t = index - lower; // Fractional part
+                    // Linear interpolation
+                    float firstValue = delayBuffer.getSample(channel, (int) std::round (lower));
+                    float secondValue = delayBuffer.getSample(channel, (int) std::round (upper));
+                    float interpolatedValue = firstValue + (t) * (secondValue - firstValue);
+                    delayBuffer.setSample(channel, i, interpolatedValue);
+                }
+            }
+        }
+        
                 
         for (int channel = 0; channel < totalNumInputChannels; ++channel)
         {
@@ -198,6 +224,8 @@ void TutorialADCAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, 
         delayBufferPosition += buffer.getNumSamples();
         if (delayBufferPosition >= currentTimeInSamples)
             delayBufferPosition -= currentTimeInSamples;
+        
+        oldTimeInSamples = currentTimeInSamples;
     }
 
 }

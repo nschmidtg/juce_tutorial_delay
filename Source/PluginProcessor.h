@@ -58,7 +58,10 @@ private:
     //==============================================================================
     int delayBufferPosition = 0;
     juce::AudioBuffer<float> delayBuffer;
-    double globalSampleRate;
+    float globalSampleRate = 44100;
+    int oldTimeInSamples = 0;
+    juce::LinearSmoothedValue<float> timeSmoothed { 0.3f };
+    
     
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TutorialADCAudioProcessor)
