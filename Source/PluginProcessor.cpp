@@ -186,6 +186,9 @@ void TutorialADCAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, 
         
         float ratio = ((float) oldTimeInSamples - 1) / ((float) currentTimeInSamples - 1);
         //DBG(ratio);
+        if(ratio < 1){
+            int here = 1;
+        }
                 
         for (int channel = 0; channel < totalNumInputChannels; ++channel)
         {
@@ -222,7 +225,7 @@ void TutorialADCAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, 
             }
         }
         delayBufferPosition = delayRead;
-        delayWritePosition = delayWrite;
+
         //delayBufferPosition = buffer.getNumSamples();
         //if (delayBufferPosition >= currentTimeInSamples)
         //    delayBufferPosition -= currentTimeInSamples;
