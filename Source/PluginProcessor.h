@@ -57,11 +57,14 @@ public:
 private:
     //==============================================================================
     int delayBufferPosition = 0;
+    int delayWritePosition = 0;
     juce::AudioBuffer<float> delayBuffer;
     float globalSampleRate = 44100;
     int oldTimeInSamples = 44100;
     juce::LinearSmoothedValue<float> timeSmoothed { 0.3f };
     float delayMaxSamples;
+    int delayRead = 0;
+    int delayWrite = 0;
     
     
     

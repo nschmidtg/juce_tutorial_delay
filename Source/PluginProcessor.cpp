@@ -9,6 +9,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+
 //==============================================================================
 TutorialADCAudioProcessor::TutorialADCAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -25,7 +26,7 @@ TutorialADCAudioProcessor::TutorialADCAudioProcessor()
     std::make_unique<juce::AudioParameterFloat> ( "gain", "Gain", 0.0f, 1.0f, 1.0f),
     std::make_unique<juce::AudioParameterFloat> ( "feedback", "Feedback", 0.0f, 1.0f, 0.35f),
     std::make_unique<juce::AudioParameterFloat> ( "mix", "Dry / Mix", 0.0f, 1.0f, 0.5f),
-    std::make_unique<juce::AudioParameterFloat>   ( "time", "Time", 0.040f, 1.0f, 0.300f),
+    std::make_unique<juce::AudioParameterFloat>   ( "time", "Time", 0.004f, 2.0f, 0.300f),
     std::make_unique<juce::AudioParameterBool> ( "toggle", "On / Off", true),
 })
 {
@@ -102,14 +103,14 @@ void TutorialADCAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
-    int maxDelay = 2000;
-    delayMaxSamples = (int) std::round (sampleRate * maxDelay / 1000.0);
+    int maxDelay = 2; //seconds
+    delayMaxSamples = (int) std::round (sampleRate * maxDelay);
     delayBuffer.setSize(2, delayMaxSamples);
     delayBuffer.clear();
     delayBufferPosition = 0;
     globalSampleRate = (float) sampleRate;
     
-    timeSmoothed.reset(sampleRate, 0.0001);
+    timeSmoothed.reset(sampleRate, 0.001);
     
 }
 
@@ -176,44 +177,55 @@ void TutorialADCAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, 
     int currentTimeInSamples = (int) std::round (intermedio);
     if(currentTimeInSamples <= 1)
         currentTimeInSamples = 1;
+
     
     bool toggle = state.getParameter("toggle")->getValue();
     
     if (toggle) {
         
         
-        float ratio = (float)(oldTimeInSamples) / (currentTimeInSamples);
+        float ratio = ((float) oldTimeInSamples - 1) / ((float) currentTimeInSamples - 1);
+        //DBG(ratio);
                 
         for (int channel = 0; channel < totalNumInputChannels; ++channel)
         {
             auto* channelData = buffer.getWritePointer (channel);
-            int delayPos = delayBufferPosition;
+            delayRead = delayBufferPosition;
             
-            //leer primero y ultimo
-            for (int i=0; i< buffer.getNumSamples(); ++i) {
-                float drySample = channelData[i];
-                int lowIndex = (int) std::round (delayPos * ratio);
-                int highIndex =  (int) std::round ((delayPos + 1) * ratio);
-                if(highIndex >= delayMaxSamples - 1 )
-                    highIndex = delayMaxSamples - 1;
-                float delaySampleLow = delayBuffer.getSample(channel, lowIndex);
-                float delaySampleHigh = delayBuffer.getSample(channel, highIndex);
-                float delaySample = ((delaySampleLow + delaySampleHigh) / 2) * feedback;
-                delayBuffer.setSample(channel, delayPos, drySample + delaySample);
+            for (int i=0; i < buffer.getNumSamples(); ++i) {
+                float delaySample = 0;
+                float index = delayRead * (ratio);
+                int lowIndex = (int) std::floor(index) % oldTimeInSamples;
+                float lowValue = delayBuffer.getSample(channel, lowIndex);
                 
-                delayPos++;
-                if(delayPos == currentTimeInSamples)
-                    delayPos = 0;
+                int highIndex =  (int) std::ceil(index) % oldTimeInSamples;
+                float highValue = delayBuffer.getSample(channel, highIndex);
+                if(highIndex != lowIndex){
+                    delaySample = (((highValue - lowValue) / ((float)highIndex - (float)lowIndex)) * index) - (lowIndex * (float)highValue) + (highIndex * (float)lowValue);
+                }
+                else {
+                    delaySample = lowValue;
+                }
+                float drySample = channelData[i];
+                delayBuffer.setSample(channel, delayRead, drySample + (delaySample * feedback));
+                
+                delayRead++;
+                delayRead = delayRead % currentTimeInSamples;
+                
                 
                 
                 channelData[i] = (drySample * (1.0f - mix) + (delaySample * mix));
                 channelData[i] *= gain;
             }
+            for(int t=currentTimeInSamples; t<delayMaxSamples; ++t){
+                delayBuffer.setSample(channel, t, 0);
+            }
         }
-        
-        delayBufferPosition += buffer.getNumSamples();
-        if (delayBufferPosition >= currentTimeInSamples)
-            delayBufferPosition -= currentTimeInSamples;
+        delayBufferPosition = delayRead;
+        delayWritePosition = delayWrite;
+        //delayBufferPosition = buffer.getNumSamples();
+        //if (delayBufferPosition >= currentTimeInSamples)
+        //    delayBufferPosition -= currentTimeInSamples;
         
         oldTimeInSamples = currentTimeInSamples;
     }
