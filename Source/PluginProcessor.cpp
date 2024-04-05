@@ -194,14 +194,14 @@ void TutorialADCAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, 
             
             for (int i=0; i < buffer.getNumSamples(); ++i) {
                 float delaySample = 0;
-                float index = delayRead * (ratio);
+                float index = (float)delayRead * (ratio);
                 int lowIndex = (int) std::floor(index) % oldTimeInSamples;
                 float lowValue = delayBuffer.getSample(channel, lowIndex);
                 
                 int highIndex =  (int) std::ceil(index) % oldTimeInSamples;
                 float highValue = delayBuffer.getSample(channel, highIndex);
                 if(highIndex != lowIndex){
-                    delaySample = (((highValue - lowValue) / ((float)highIndex - (float)lowIndex)) * index) - (lowIndex * (float)highValue) + (highIndex * (float)lowValue);
+                    delaySample = (((highValue - lowValue) / ((float)highIndex - (float)lowIndex)) * index) - ((float)lowIndex * highValue) + ((float)highIndex * lowValue);
                 }
                 else {
                     delaySample = lowValue;
