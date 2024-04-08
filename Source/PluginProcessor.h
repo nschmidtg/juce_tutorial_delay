@@ -56,7 +56,6 @@ public:
     juce::AudioProcessorValueTreeState state;
 private:
     //==============================================================================
-    int delayBufferPosition = 0;
     int delayWritePosition = 0;
     juce::AudioBuffer<float> delayBuffer;
     float globalSampleRate = 44100;
@@ -65,7 +64,12 @@ private:
     float delayMaxSamples;
     int delayRead = 0;
     int delayWrite = 0;
-    
+    std::vector<int> writeHeadBuffer;
+    std::vector<int> readHeadBuffer;
+    int lastWriteHead = 0;
+    int lastReadHead = 0;
+    int currentTimeInSamples = 44100;
+    std::vector<int> delaySizeBuffer;
     
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TutorialADCAudioProcessor)
