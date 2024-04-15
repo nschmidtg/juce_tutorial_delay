@@ -54,6 +54,7 @@ public:
     void setStateInformation (const void* data, int sizeInBytes) override;
 
     juce::AudioProcessorValueTreeState state;
+    void resampleBuffer (int initialSampleSize, int targetSampleSize);
 private:
     //==============================================================================
     int delayWritePosition = 0;
@@ -61,7 +62,7 @@ private:
     float globalSampleRate = 44100;
     int oldTimeInSamples = 44100;
     juce::LinearSmoothedValue<float> timeSmoothed { 0.3f };
-    float delayMaxSamples;
+    int delayMaxSamples;
     int delayRead = 0;
     int delayWrite = 0;
     std::vector<int> writeHeadBuffer;
@@ -70,6 +71,7 @@ private:
     int lastReadHead = 0;
     int currentTimeInSamples = 44100;
     std::vector<int> delaySizeBuffer;
+    int maxDelay = 2;
     
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TutorialADCAudioProcessor)

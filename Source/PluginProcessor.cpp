@@ -8,6 +8,7 @@
 
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include <math.h>
 
 
 //==============================================================================
@@ -103,14 +104,13 @@ void TutorialADCAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
-    int maxDelay = 2; //seconds
-    delayMaxSamples = static_cast<int>(sampleRate * maxDelay);
+    delayMaxSamples = (int) std::round(sampleRate * maxDelay);
     delayBuffer.setSize(2, delayMaxSamples);
     delayBuffer.clear();
     globalSampleRate = (float) sampleRate;
     writeHeadBuffer.resize(samplesPerBlock);
     readHeadBuffer.resize(samplesPerBlock);
-    timeSmoothed.reset(sampleRate, 0.1f);
+    timeSmoothed.reset(sampleRate, 0.01f);
     delaySizeBuffer.resize(samplesPerBlock);
     currentTimeInSamples = 0.3f * delayMaxSamples;
     
@@ -148,57 +148,107 @@ bool TutorialADCAudioProcessor::isBusesLayoutSupported (const BusesLayout& layou
 }
 #endif
 
-void TutorialADCAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
+void TutorialADCAudioProcessor::resampleBuffer (int initialSampleSize, int targetSampleSize)
+{
+    
+    // Check for valid sample sizes and ensure initialSampleSize > targetSampleSize
+    if (initialSampleSize <= 0 || targetSampleSize <= 0 || initialSampleSize <= targetSampleSize) {
+        // Handle error: Invalid sample sizes
+        return;
+    }
+
+    // Ensure lastWriteHead is within bounds of delay buffer
+    lastWriteHead = (lastWriteHead + delayMaxSamples) % delayMaxSamples;
+    for (int channel = 0; channel < 2; ++channel) {
+        // Calculate ratio for resampling
+        float ratio = static_cast<float>(initialSampleSize - 1) / static_cast<float>(targetSampleSize - 1);
+
+        // Calculate starting and ending read indices
+        int indexStart = (lastWriteHead - initialSampleSize + delayMaxSamples) % delayMaxSamples;
+        int indexFinish = lastWriteHead;
+
+        // Initialize writeIndex to the starting index
+        int writeIndex = (lastWriteHead - (initialSampleSize - targetSampleSize) + delayMaxSamples) % delayMaxSamples;
+
+        // Perform resampling using linear interpolation
+        for (int i = 0; i < targetSampleSize; ++i) {
+            float readIndex = indexStart + i * ratio;
+
+            // Calculate the lower and upper indices for interpolation
+            int xlow = static_cast<int>(readIndex);
+            int xhigh = xlow + 1;
+
+            // Wrap indices around the circular buffer
+            xlow = (xlow + delayMaxSamples) % delayMaxSamples;
+            xhigh = (xhigh + delayMaxSamples) % delayMaxSamples;
+
+            // Perform linear interpolation
+            float ylow = delayBuffer.getSample(channel, xlow);
+            float yhigh = delayBuffer.getSample(channel, xhigh);
+            float yInterpolated = ylow + (readIndex - xlow) * (yhigh - ylow);
+
+            // Write interpolated sample to delay buffer
+            delayBuffer.setSample(channel, writeIndex, yInterpolated);
+
+            // Move writeIndex to the next position
+            writeIndex = (writeIndex + 1) % delayMaxSamples;
+        }
+    }
+    
+}
+
+void TutorialADCAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
-    auto totalNumInputChannels  = getTotalNumInputChannels();
+    auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
+        buffer.clear(i, 0, buffer.getNumSamples());
 
-    float gain = state.getParameter ("gain")->getValue();
-    float feedback = state.getParameter ("feedback")->getValue();
+    float gain = state.getParameter("gain")->getValue();
+    float feedback = state.getParameter("feedback")->getValue();
     float mix = state.getParameter("mix")->getValue();
-    float time = state.getParameter("time")->getValue();
+    float time = state.getParameter("time")->getValue(); // Use getNextValue directly for smoother updates
     timeSmoothed.setTargetValue(time);
+    
+    int currentTimeInSamples = static_cast<int>(timeSmoothed.getNextValue() * delayMaxSamples); // Calculate current time in samples directly
 
+    // Resample the delay buffer if the time parameter has changed
+    if (oldTimeInSamples != currentTimeInSamples)
+        resampleBuffer(oldTimeInSamples, currentTimeInSamples);
 
-    int currentTimeInSamples = std::round(timeSmoothed.getNextValue() * globalSampleRate * 2.0f);
-        
-    for(int i = 0; i<buffer.getNumSamples(); ++i){
-        delaySizeBuffer[i] = std::round(timeSmoothed.getNextValue() * globalSampleRate * 2.0f);
-        
-        lastWriteHead = (lastWriteHead + 1) % currentTimeInSamples;
-        writeHeadBuffer[i] = lastWriteHead;
-        
-        //readHeadBuffer[i] = lastReadHead % currentTimeInSamples;
-        //lastReadHead += 1;
-    }
-    
-    
-    
-    //float ratio = ((float) oldTimeInSamples - 1) / ((float) timeSmoothedArray[0] - 1);
-            
+    oldTimeInSamples = currentTimeInSamples; // Update oldTimeInSamples
+
+    // Iterate over each channel
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
-        auto* channelData = buffer.getWritePointer (channel);
-        
-        for (int i=0; i < buffer.getNumSamples(); ++i) {
-            int wIndex = writeHeadBuffer[i];
-            int rIndex = (wIndex + 1) % currentTimeInSamples;
-    
-            float delaySample = delayBuffer.getSample(channel, rIndex);
-            float drySample = channelData[i];
-            delayBuffer.setSample(channel, wIndex, drySample + (delaySample * feedback));
-            
-            channelData[i] = (drySample * (1.0f - mix) + (delaySample * mix));
+        auto* channelData = buffer.getWritePointer(channel);
+        int writeIndex = writeHeadBuffer[channel];
+
+        // Iterate over each sample in the buffer
+        for (int i = 0; i < buffer.getNumSamples(); ++i)
+        {
+            // Get the read index based on the current time
+            int readIndex = (writeIndex - currentTimeInSamples + delayMaxSamples) % delayMaxSamples;
+            float delaySample = delayBuffer.getSample(channel, readIndex); // Get the delay sample
+
+            // Update delay buffer with input sample and feedback
+            delayBuffer.setSample(channel, writeIndex, channelData[i] + (delaySample * feedback));
+
+            // Apply wet/dry mix
+            channelData[i] = (channelData[i] * (1.0f - mix)) + (delaySample * mix);
+
+            // Apply gain
             channelData[i] *= gain;
+
+            // Update write index
+            writeIndex = (writeIndex + 1) % delayMaxSamples;
         }
+
+        // Update write head buffer
+        writeHeadBuffer[channel] = writeIndex;
     }
-
-    oldTimeInSamples = currentTimeInSamples;
-
 }
 
 //==============================================================================
