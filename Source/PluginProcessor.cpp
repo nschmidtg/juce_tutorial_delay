@@ -108,9 +108,9 @@ void TutorialADCAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     delayBuffer.setSize(2, delayMaxSamples);
     delayBuffer.clear();
     globalSampleRate = (float) sampleRate;
-    writeHeadBuffer.resize(samplesPerBlock);
+    writeHeadBuffer.resize(2);
     readHeadBuffer.resize(samplesPerBlock);
-    timeSmoothed.reset(sampleRate, 0.01f);
+    timeSmoothed.reset(sampleRate, 0.00000001f);
     delaySizeBuffer.resize(samplesPerBlock);
     currentTimeInSamples = 0.3f * delayMaxSamples;
     
@@ -148,6 +148,19 @@ bool TutorialADCAudioProcessor::isBusesLayoutSupported (const BusesLayout& layou
 }
 #endif
 
+float cubicInterpolation(float y0, float y1, float y2, float y3, float mu) {
+    float a0, a1, a2, a3;
+    float mu2;
+
+    mu2 = mu * mu;
+    a0 = y3 - y2 - y0 + y1;
+    a1 = y0 - y1 - a0;
+    a2 = y2 - y0;
+    a3 = y1;
+
+    return (a0 * mu * mu2 + a1 * mu2 + a2 * mu + a3);
+}
+
 void TutorialADCAudioProcessor::resampleBuffer (int initialSampleSize, int targetSampleSize)
 {
     
@@ -165,7 +178,6 @@ void TutorialADCAudioProcessor::resampleBuffer (int initialSampleSize, int targe
 
         // Calculate starting and ending read indices
         int indexStart = (lastWriteHead - initialSampleSize + delayMaxSamples) % delayMaxSamples;
-        int indexFinish = lastWriteHead;
 
         // Initialize writeIndex to the starting index
         int writeIndex = (lastWriteHead - (initialSampleSize - targetSampleSize) + delayMaxSamples) % delayMaxSamples;
@@ -174,18 +186,26 @@ void TutorialADCAudioProcessor::resampleBuffer (int initialSampleSize, int targe
         for (int i = 0; i < targetSampleSize; ++i) {
             float readIndex = indexStart + i * ratio;
 
-            // Calculate the lower and upper indices for interpolation
-            int xlow = static_cast<int>(readIndex);
-            int xhigh = xlow + 1;
+            // Calculate the neighboring indices for interpolation
+            int xlow1 = static_cast<int>(std::floor(readIndex)) - 1;
+            int xlow2 = static_cast<int>(std::floor(readIndex));
+            int xhigh1 = static_cast<int>(std::ceil(readIndex));
+            int xhigh2 = static_cast<int>(std::ceil(readIndex)) + 1;
 
             // Wrap indices around the circular buffer
-            xlow = (xlow + delayMaxSamples) % delayMaxSamples;
-            xhigh = (xhigh + delayMaxSamples) % delayMaxSamples;
+            xlow1 = (xlow1 + delayMaxSamples) % delayMaxSamples;
+            xlow2 = (xlow2 + delayMaxSamples) % delayMaxSamples;
+            xhigh1 = (xhigh1 + delayMaxSamples) % delayMaxSamples;
+            xhigh2 = (xhigh2 + delayMaxSamples) % delayMaxSamples;
 
-            // Perform linear interpolation
-            float ylow = delayBuffer.getSample(channel, xlow);
-            float yhigh = delayBuffer.getSample(channel, xhigh);
-            float yInterpolated = ylow + (readIndex - xlow) * (yhigh - ylow);
+            // Perform cubic interpolation
+            float ylow1 = delayBuffer.getSample(channel, xlow1);
+            float ylow2 = delayBuffer.getSample(channel, xlow2);
+            float yhigh1 = delayBuffer.getSample(channel, xhigh1);
+            float yhigh2 = delayBuffer.getSample(channel, xhigh2);
+
+            float mu = (readIndex - xlow1) / (xhigh2 - xlow1);
+            float yInterpolated = cubicInterpolation(ylow1, ylow2, yhigh1, yhigh2, mu);
 
             // Write interpolated sample to delay buffer
             delayBuffer.setSample(channel, writeIndex, yInterpolated);

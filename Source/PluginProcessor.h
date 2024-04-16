@@ -55,6 +55,10 @@ public:
 
     juce::AudioProcessorValueTreeState state;
     void resampleBuffer (int initialSampleSize, int targetSampleSize);
+    float calculateReadIndex(float time);
+    float calculateInterpolationFactor(float previousTime, float currentTime);
+    float interpolateSample(int channel, float readIndex, float mu);
+    float sampleRateInterpolation(int channel, float previousTime, float currentTime);
 private:
     //==============================================================================
     int delayWritePosition = 0;
