@@ -110,7 +110,8 @@ void TutorialADCAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     globalSampleRate = (float) sampleRate;
     writeHeadBuffer.resize(2);
     readHeadBuffer.resize(samplesPerBlock);
-    timeSmoothed.reset(sampleRate, 0.001f);
+    timeSmoothed.reset(sampleRate, 0.01f);
+    timeSmoothed.setCurrentAndTargetValue (state.getParameter("time")->getValue());
     delaySizeBuffer.resize(samplesPerBlock);
     currentTimeInSamples = 0.3f * delayMaxSamples;
     
@@ -235,8 +236,8 @@ void TutorialADCAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, j
     int currentTimeInSamples = static_cast<int>(timeSmoothed.getNextValue() * delayMaxSamples); // Calculate current time in samples directly
 
     // Resample the delay buffer if the time parameter has changed
-    if (oldTimeInSamples != currentTimeInSamples)
-        resampleBuffer(oldTimeInSamples, currentTimeInSamples);
+    // if (oldTimeInSamples != currentTimeInSamples)
+    //     resampleBuffer(oldTimeInSamples, currentTimeInSamples);
 
     oldTimeInSamples = currentTimeInSamples; // Update oldTimeInSamples
 
@@ -249,6 +250,7 @@ void TutorialADCAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, j
         // Iterate over each sample in the buffer
         for (int i = 0; i < buffer.getNumSamples(); ++i)
         {
+            
             // Get the read index based on the current time
             int readIndex = (writeIndex - currentTimeInSamples + delayMaxSamples) % delayMaxSamples;
             float delaySample = delayBuffer.getSample(channel, readIndex); // Get the delay sample
