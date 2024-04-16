@@ -110,7 +110,7 @@ void TutorialADCAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     globalSampleRate = (float) sampleRate;
     writeHeadBuffer.resize(2);
     readHeadBuffer.resize(samplesPerBlock);
-    timeSmoothed.reset(sampleRate, 0.00000001f);
+    timeSmoothed.reset(sampleRate, 0.001f);
     delaySizeBuffer.resize(samplesPerBlock);
     currentTimeInSamples = 0.3f * delayMaxSamples;
     
