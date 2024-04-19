@@ -218,7 +218,7 @@ void TutorialADCAudioProcessor::resampleBuffer (int initialSampleSize, int targe
     
 }
 
-float TutorialADCAudioProcessor::interpolate(juce::AudioBuffer<float> buffer, int channel, int position, float ratio) {
+float TutorialADCAudioProcessor::interpolate(juce::AudioBuffer<float>& buffer, int channel, int position, float ratio) {
     float readIndex = position * ratio;
     
     int xlow1 = static_cast<int>(std::floor(readIndex)) - 1;
@@ -289,12 +289,12 @@ void TutorialADCAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, j
             float crossfadeFactor = 1.0f;
                         
 
-                // float stretchedSample = interpolate(delayBuffer, channel, readIndex, playbackRate); esto me causa problemas simplemente por pasarle el buffer...
-                // float outputSample = crossfadeFactor * delaySample + (1.0f - crossfadeFactor) * stretchedSample;
+                float stretchedSample = interpolate(delayBuffer, channel, readIndex, playbackRate); // esto me causa problemas simplemente por pasarle el buffer...
+                float outputSample = crossfadeFactor * delaySample + (1.0f - crossfadeFactor) * stretchedSample;
                 // Update delay buffer with input sample and feedback
-                delayBuffer.setSample(channel, writeIndex, channelData[i] + (delaySample * feedback));
+                delayBuffer.setSample(channel, writeIndex, channelData[i] + (outputSample * feedback));
                 // Apply wet/dry mix
-                channelData[i] = (channelData[i] * (1.0f - mix)) + (delaySample * mix);
+                channelData[i] = (channelData[i] * (1.0f - mix)) + (outputSample * mix);
                 // Apply gain
                 channelData[i] *= gain;
 
