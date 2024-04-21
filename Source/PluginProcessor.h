@@ -59,6 +59,7 @@ public:
     float calculateInterpolationFactor(float previousTime, float currentTime);
     float interpolateSample(int channel, float readIndex, float mu);
     float sampleRateInterpolation(int channel, float previousTime, float currentTime);
+    float interpolate(juce::AudioBuffer<float>& buffer, int channel, int position, float ratio);
 private:
     //==============================================================================
     int delayWritePosition = 0;
